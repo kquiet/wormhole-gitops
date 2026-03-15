@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "opentelemetry/wormhole"
+        instrumentation.opentelemetry.io/python-container-names: "backend"
+    spec:
+      volumes:
+        - name: backend-data-volume
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: backend-upload-volume
+          persistentVolumeClaim:
+            claimName: backend-upload
+      initContainers:
+        - name: prepare-data
+          image: google/cloud-sdk:slim
+          volumeMounts:
+            - name: backend-data-volume
+              mountPath: /temp-volume-data
+            - name: backend-upload-volume
+              mountPath: /temp-volume-upload
+          command:
+            - sh
+            - -c
+            - |
+              echo "Syncing static & tiktoken_data from GCS..." && \
+              gsutil -m rsync -x "static" -r gs://wormhole-backend /temp-volume-data && \
+              gsutil -m rsync -r gs://wormhole-backend/static /temp-volume-upload
+      containers:
+        - name: backend
+          image: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-backend:0.0.4
+          volumeMounts:
+            - name: backend-data-volume
+              mountPath: /opt/wormhole-backend
+            - name: backend-upload-volume
+              mountPath: /app/static
+          env:
+          - name: OPENSEARCH_USE
+            value: "true"
+          - name: TIKTOKEN_CACHE_DIR
+            value: "/opt/wormhole-backend/tiktoken_data"
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: backend-database-credentials
+                key: username
+          - name: DB_PASS
+            valueFrom:
+              secretKeyRef:
+                name: backend-database-credentials
+                key: password
+          - name: OPENSEARCH_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: backend-opensearch-credentials
+                key: username
+          - name: OPENSEARCH_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: backend-opensearch-credentials
+                key: password
+          ports:
+            - containerPort: 8111
+          resources:
+            requests:
+              memory: "1024Mi"
+              cpu: "1000m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
+          startupProbe:
+            httpGet:
+              path: /api/health_check/livez
+              port: 8111
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 4
+          livenessProbe:
+            httpGet:
+              path: /api/health_check/livez
+              port: 8111
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /api/health_check/readyz
+              port: 8111
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 12
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: cloud.google.com/gke-provisioning
+                operator: In
+                values:
+                - spot
+            weight: 50
+          - preference:
+              matchExpressions:
+              - key: nvidia.com/gpu
+                operator: DoesNotExist
+            weight: 100
+      tolerations:
+      - key: cloud.google.com/gke-spot
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule

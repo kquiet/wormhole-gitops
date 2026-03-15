@@ -1,0 +1,95 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+spec:
+  project: need-to-override
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.17.2
+    helm:
+      valuesObject:
+        serviceAccount:
+          annotations:
+            iam.gke.io/gcp-service-account: need-to-override
+        extraArgs:
+        - --issuer-ambient-credentials
+        crds:
+          enabled: true
+          keep: true
+        config:
+          apiVersion: controller.config.cert-manager.io/v1alpha1
+          kind: ControllerConfiguration
+          enableGatewayAPI: true
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                - key: cloud.google.com/gke-provisioning
+                  operator: In
+                  values:
+                  - spot
+              weight: 100
+        tolerations:
+        - key: cloud.google.com/gke-spot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+        webhook:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - preference:
+                  matchExpressions:
+                  - key: cloud.google.com/gke-provisioning
+                    operator: In
+                    values:
+                    - spot
+                weight: 100
+          tolerations:
+          - key: cloud.google.com/gke-spot
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        cainjector:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - preference:
+                  matchExpressions:
+                  - key: cloud.google.com/gke-provisioning
+                    operator: In
+                    values:
+                    - spot
+                weight: 100
+          tolerations:
+          - key: cloud.google.com/gke-spot
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        startupapicheck:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - preference:
+                  matchExpressions:
+                  - key: cloud.google.com/gke-provisioning
+                    operator: In
+                    values:
+                    - spot
+                weight: 100
+          tolerations:
+          - key: cloud.google.com/gke-spot
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+  destination:
+    server: need-to-override
+    namespace: cert-manager
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

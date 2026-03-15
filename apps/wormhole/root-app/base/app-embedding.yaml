@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: embedding
+spec:
+  project: need-to-override
+  source:
+    repoURL: need-to-override
+    path: apps/wormhole/embedding/overlays/dev
+    targetRevision: HEAD
+  destination:
+    server: need-to-override
+    namespace: need-to-override
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

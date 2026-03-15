@@ -1,0 +1,48 @@
+@startuml
+participant frontend as fr
+participant backend as bk
+participant preprocessing as pr
+participant ocr as ocr
+participant embedding as eb
+participant reranker as rr
+participant llm as llm
+participant opensearch as op
+
+group 檔案上傳
+fr -> bk: file content
+bk -> pr: file content
+alt pdf contains image
+    pr -> ocr: pdf file content
+    ocr -> pr: pdf file text
+end
+pr -> bk: file chunks (text)
+bk -> eb: file chunks
+eb -> bk: file vectors
+bk -> op: file vectors with texts
+op -> bk: save result
+bk -> fr: upload result
+end
+
+group 直接問答
+fr -> bk: question
+bk -> llm: question
+llm -> bk: answer
+bk -> fr: answer
+end
+
+group 檔案問答
+fr -> bk: question
+bk -> eb: question
+eb -> bk: question vector
+bk -> op: question vector
+op -> bk: top 100 document chunks (vector with text)
+note right: similarity via cosine
+bk -> rr: question + texts of document chunks
+rr -> bk: ordered texts of document chunks
+note right: similarity via transformer
+bk -> llm: system prompt + question + chat history + limited texts of documents chunks
+note right: limited texts due to token limit
+llm -> bk: answer
+bk -> fr: answer
+end
+@enduml

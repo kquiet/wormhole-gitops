@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocr
+spec:
+  selector:
+    matchLabels:
+      app: ocr
+  template:
+    metadata:
+      labels:
+        app: ocr
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "opentelemetry/wormhole"
+        instrumentation.opentelemetry.io/python-container-names: "ocr"
+    spec:
+      volumes:
+        - name: ocr-model-volume
+          emptyDir:
+            sizeLimit: 1Gi
+      initContainers:
+        - name: prepare-ocr-model
+          image: google/cloud-sdk:slim
+          volumeMounts:
+            - name: ocr-model-volume
+              mountPath: /temp-volume-root
+          command:
+            - sh
+            - -c
+            - |
+              echo "Syncing paddleocr model from GCS..." && \
+              gsutil -m rsync -r gs://wormhole-ocr /temp-volume-root/
+      containers:
+        - name: ocr
+          image: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-ocr:0.1.0
+          volumeMounts:
+            - name: ocr-model-volume
+              mountPath: /opt/wormhole-ocr
+          env:
+          - name: PADDLE_OCR_BASE_DIR
+            value: "/opt/wormhole-ocr/paddleocr_model"
+          ports:
+            - containerPort: 5001
+          resources:
+            requests:
+              memory: "2048Mi"
+              cpu: "1000m"
+              nvidia.com/gpu: 1
+            limits:
+              memory: "2048Mi"
+              cpu: "1000m"
+              nvidia.com/gpu: 1
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 5001
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 8
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 12
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: cloud.google.com/gke-provisioning
+                operator: In
+                values:
+                - spot
+            weight: 100
+      tolerations:
+      - key: cloud.google.com/gke-spot
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      nodeSelector:
+        cloud.google.com/gke-gpu-driver-version: "default" # use this to trigger automatic installation of gpu driver during node-autoprovisioing

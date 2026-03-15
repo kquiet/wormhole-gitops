@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm
+spec:
+  selector:
+    app: llm
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 5003
+  type: ClusterIP

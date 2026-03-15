@@ -1,0 +1,36 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ocr
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ocr
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: prometheus.googleapis.com|DCGM_FI_PROF_GR_ENGINE_ACTIVE|gauge
+      target:
+        type: AverageValue
+        averageValue: 90
+  behavior:
+    scaleDown:
+      policies:
+      - periodSeconds: 30
+        type: Percent
+        value: 25
+      stabilizationWindowSeconds: 0
+    scaleUp:
+      policies:
+      - periodSeconds: 15
+        type: Pods
+        value: 2
+      - periodSeconds: 15
+        type: Percent
+        value: 50
+      selectPolicy: Max
+      stabilizationWindowSeconds: 0

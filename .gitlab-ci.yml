@@ -1,0 +1,33 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /^nocicd/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME =~ /^main$/
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api" || $CI_PIPELINE_SOURCE == "external" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "pipeline" || $CI_PIPELINE_SOURCE == "parent_pipeline"
+
+stages:
+  - deploy
+
+variables:
+  GIT_STRATEGY: "clone"
+  DEPLOY_HOST: "wormhole-bastion01"
+  DEPLOY_PATH: "/opt/wormhole-gitops-repo"
+
+sync-to-gcp-vm:
+  stage: deploy
+  tags:
+    - zoo
+    - hpc
+  image:
+    name: docker-group.repo.svc.zoo/ubuntu:jammy-utils-latest
+  script:
+    - mkdir -p ~/.ssh && cp "$REPO_DEVOPS_SSH_CONFIG" ~/.ssh/config && cp "$REPO_DEVOPS_SSH_KEY" ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+    - ls -al ~/.ssh
+    - git remote show origin
+    - git fetch origin "+refs/heads/*:refs/heads/*" --tags --prune
+    - git show-ref
+    - git log
+    - git status
+    - ssh "$DEPLOY_HOST" "sudo mkdir -p \"$DEPLOY_PATH\" && sudo chown -R devops:devops \"$DEPLOY_PATH\""
+    - echo "Syncing to $DEPLOY_HOST:$DEPLOY_PATH/"
+    - rsync -rltvzP --delete-excluded ./ "$DEPLOY_HOST:$DEPLOY_PATH/"

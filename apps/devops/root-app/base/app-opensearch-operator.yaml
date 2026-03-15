@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opensearch-operator
+spec:
+  project: need-to-override
+  source:
+    repoURL: https://opensearch-project.github.io/opensearch-k8s-operator
+    chart: opensearch-operator
+    targetRevision: 2.7.0
+    helm: # not yet support affinity at 2.7.0
+      valuesObject:
+        tolerations:
+        - key: cloud.google.com/gke-spot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+        manager:
+          dnsBase: need-to-override
+  destination:
+    server: need-to-override
+    namespace: opensearch-operator
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

@@ -1,0 +1,38 @@
+1. 建立 GKE Standard Cluster時要確定的選項：
+   - Target release channel => Regular
+   - Target version => 選最新的版本(>=1.32.3)
+   - default-pool
+     - Number of nodes (per zone) => 0
+     - Enable cluster autoscaler => Size limits type: Total limits => Maximum number of all nodes: 設定此pool總量上限
+   - Automation
+     - Enable vertical Pod autoscaling
+     - Enable node auto-provisioning
+       - Limits => 設定全cluster的cpu, memory, gpu上限  (cpu: 2~32, memory: 4~96, NVIDIA L4: 0~4, NVIDIA T4: 0~4)
+       - Access scopes => Allow default access
+       - Node pool locations => Select all zones
+       - Autoscaling profile => Optimize utilization  (自動縮減node較快)
+   - Networking
+     - Network => wormholedevvpc
+     - Node subnet => wormholedevsubnet-2
+     - Enable Dataplane V2
+     - Enable Dataplane V2 metrics
+     - Enable Dataplane V2 observability
+     - Enable Gateway API
+     - DNS provider => Cloud DNS => VPC scope => use cluster name as Cluster domain suffix (or preferred one)
+   - Security
+     - Enable Secret Manager
+     - Enable Workload Identity => automatically configure each node pool: Enable GKE Metadata Server
+   - Features
+     - Enable Logging => Add a component: Workloads
+     - Enable Cloud Monitoring => Add a component: NVIDIA Data Center GPU Manager (DCGM)
+     - Enable Managed Service for Prometheus
+     - Enable Compute Engine Persistent Disk CSI Driver
+     - Enable Filestore CSI Driver
+     - Enable Cloud Storage FUSE CSI Driver
+     - Enable image streaming
+2. 建立完成後，確定GCP專案已啟用以下google api(以下提供wormhole-dev專案的api啟用網頁)：
+ - [Cloud Monitoring API](https://console.developers.google.com/apis/api/monitoring.googleapis.com/overview?project=wormhole-proj-id)
+ - [Cloud Logging API](https://console.developers.google.com/apis/api/logging.googleapis.com/overview?project=wormhole-proj-id)
+ - [Cloud Trace API](https://console.developers.google.com/apis/api/cloudtrace.googleapis.com/overview?project=wormhole-proj-id)
+ - [Telemetry API](https://console.developers.google.com/apis/api/telemetry.googleapis.com/overview?project=wormhole-proj-id)
+ - [Cloud Filestore API](https://console.developers.google.com/apis/api/file.googleapis.com/overview?project=wormhole-proj-id)

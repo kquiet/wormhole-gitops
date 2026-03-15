@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: preprocessing
+spec:
+  selector:
+    matchLabels:
+      app: preprocessing
+  template:
+    metadata:
+      labels:
+        app: preprocessing
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "opentelemetry/wormhole"
+        instrumentation.opentelemetry.io/python-container-names: "preprocessing"
+    spec:
+      volumes:
+        - name: preprocessing-data-volume
+          emptyDir:
+            sizeLimit: 1Gi
+      initContainers:
+        - name: prepare-data
+          image: google/cloud-sdk:slim
+          volumeMounts:
+            - name: preprocessing-data-volume
+              mountPath: /temp-volume-root
+          command:
+            - sh
+            - -c
+            - |
+              echo "Syncing nltk_data & tiktoken_data from GCS..." && \
+              gsutil -m rsync -r gs://wormhole-preprocessing /temp-volume-root/
+      containers:
+        - name: preprocessing
+          image: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-preprocessing:0.1.0
+          volumeMounts:
+            - name: preprocessing-data-volume
+              mountPath: /opt/wormhole-preprocessing
+          env:
+          - name: OCR_SERVER_URL
+            value: "http://ocr.dev.wormhole"
+          - name: NLTK_DATA
+            value: "/opt/wormhole-preprocessing/nltk_data"
+          - name: TIKTOKEN_CACHE_DIR
+            value: "/opt/wormhole-preprocessing/tiktoken_data"
+          - name: DO_NOT_TRACK
+            value: "true"
+          ports:
+            - containerPort: 5002
+          resources:
+            requests:
+              memory: "1024Mi"
+              cpu: "1000m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 5002
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 4
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5002
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5002
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 12
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: cloud.google.com/gke-provisioning
+                operator: In
+                values:
+                - spot
+            weight: 50
+          - preference:
+              matchExpressions:
+              - key: nvidia.com/gpu
+                operator: DoesNotExist
+            weight: 100
+      tolerations:
+      - key: cloud.google.com/gke-spot
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule

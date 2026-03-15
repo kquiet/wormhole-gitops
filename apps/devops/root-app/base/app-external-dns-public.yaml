@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-dns-public
+spec:
+  project: need-to-override
+  source:
+    repoURL: https://kubernetes-sigs.github.io/external-dns
+    chart: external-dns
+    targetRevision: 1.16.1
+    helm:
+      releaseName: external-dns-public
+      valuesObject:
+        namespaced: false
+        serviceAccount:
+          annotations:
+            iam.gke.io/gcp-service-account: need-to-override
+        sources:
+        - service
+        - ingress
+        - gateway-httproute
+        domainFilters: []
+        provider:
+          name: google
+        extraArgs: []
+        policy: upsert-only
+        logFormat: json
+        registry: txt
+        txtOwnerId: wormhole-devops-public
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                - key: cloud.google.com/gke-provisioning
+                  operator: In
+                  values:
+                  - spot
+              weight: 100
+        tolerations:
+        - key: cloud.google.com/gke-spot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+  destination:
+    server: need-to-override
+    namespace: need-to-override
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

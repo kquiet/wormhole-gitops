@@ -1,0 +1,77 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: backend
+spec:
+  gatewayClassName: gke-l7-rilb
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backend
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: backend
+    sectionName: http
+  rules:
+  - backendRefs:
+    - group: ""
+      kind: Service
+      name: backend
+      port: 80
+      weight: 1
+    matches:
+    - path:
+        type: PathPrefix
+        value: /
+---
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: backend
+spec:
+  default:
+    checkIntervalSec: 5
+    timeoutSec: 2
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    logConfig:
+      enabled: true
+    config:
+      type: HTTP
+      httpHealthCheck:
+        port: 8111
+        requestPath: /api/health_check/readyz
+  targetRef:
+    group: ""
+    kind: Service
+    name: backend
+---
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: backend
+spec:
+  default:
+    balancingMode: RATE
+    capacityScalerPercent: 100
+    connectionDraining:
+      drainingTimeoutSec: 0
+    logging:
+      enabled: true
+      optionalMode: INCLUDE_ALL_OPTIONAL
+      sampleRate: 1e6
+    maxRatePerEndpoint: 5
+    sessionAffinity:
+      type: NONE
+    timeoutSec: 300
+  targetRef:
+    group: ""
+    kind: Service
+    name: backend

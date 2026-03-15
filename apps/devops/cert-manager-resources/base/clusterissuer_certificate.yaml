@@ -1,0 +1,64 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: wormhole-intermediate-ca-issuer
+spec:
+  ca:
+    secretName: wormhole-root-ca-tls
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wormhole-intermediate-ca
+spec:
+  isCA: true
+  commonName: wormhole Intermediate CA
+  secretName: wormhole-intermediate-ca-tls
+  duration: 35064h # 4 years
+  renewBefore: 2160h # 90 days
+  privateKey:
+    algorithm: RSA
+    size: 4096
+    rotationPolicy: Always
+  issuerRef:
+    name: wormhole-intermediate-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: wormhole-certificate-issuer
+spec:
+  ca:
+    secretName: wormhole-intermediate-ca-tls
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: wormhole-cloud-dns-letsencrypt-staging
+spec:
+  acme:
+    email: admin@zoo.internal
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: wormhole-cloud-dns-letsencrypt-staging-key
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: need-to-override
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: wormhole-cloud-dns-letsencrypt-production
+spec:
+  acme:
+    email: admin@zoo.internal
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: wormhole-cloud-dns-letsencrypt-production-key
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: need-to-override

@@ -1,0 +1,16 @@
+@startuml
+cloud LAN as c1 {
+  actor developer as at1
+  database "Gitops Repository" as db1
+}
+cloud GCP as c2 {
+  node "VM" as nd1
+  package GKE as p1 {
+    component "Argo CD" as cp1
+  }
+}
+at1 -right-> db1 : 1.修改main分支
+db1 -down-> nd1 : 2.更新repository副本
+cp1 -up-> nd1 : 3.監控repository副本
+note right of cp1 : 4.依設定自動/手動部署wormhole各系統
+@enduml

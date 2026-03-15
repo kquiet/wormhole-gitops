@@ -1,0 +1,12 @@
+- op: replace
+  path: /spec/project
+  value: wormhole-dev
+- op: replace
+  path: /spec/source/repoURL
+  value: ssh://devops@192.168.100.2:443/opt/wormhole-gitops-repo
+- op: replace
+  path: /spec/destination/server
+  value: https://35.212.195.32
+- op: replace
+  path: /spec/destination/namespace
+  value: wormhole-dev

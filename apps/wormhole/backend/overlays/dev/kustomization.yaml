@@ -1,0 +1,171 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - gateway_route_policy.yaml
+  - pv.yaml
+  - mysql_service.yaml
+
+namespace: wormhole-dev
+
+patches:
+  - target:
+      kind: ExternalSecret
+      name: backend-database-credentials
+    patch: |
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: dev-backend-database-user
+      - op: replace
+        path: /spec/data/1/remoteRef/key
+        value: dev-backend-database-pwd
+  - target:
+      kind: ExternalSecret
+      name: backend-opensearch-credentials
+    patch: |
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: dev-backend-opensearch-pwd
+  - target:
+      kind: PersistentVolumeClaim
+      name: backend-upload
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+      - op: replace
+        path: /spec/volumeName
+        value: wormhole-dev-backend-upload
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-backend:0.0.4
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DB_HOST
+          value: mysql
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DB_PORT
+          value: "3306"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DB_SCHEMA
+          value: wormhole
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: IS_GCP_ON
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: GCP_PROJECT_ID
+          value: "wormhole-proj-id"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: GCP_BUCKET_NAME
+          value: "wormhole-storage-static"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: PREPROC_SERVER_URL
+          value: "http://preprocessing.dev.wormhole"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: EMBEDDING_SERVER_URL
+          value: "http://embedding.dev.wormhole"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: LLM_SERVER_URL
+          value: "http://llm.dev.wormhole"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: RERANKER_SERVER_URL
+          value: "http://reranker.dev.wormhole"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OPENSEARCH_URL
+          value: "https://opensearch-cluster:9200"
+  - target:
+      kind: Service
+      name: backend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: Gateway
+      name: backend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+      - op: add
+        path: /spec/listeners/0/hostname
+        value: backend.dev.wormhole
+  - target:
+      kind: HTTPRoute
+      name: backend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+  - target:
+      kind: HealthCheckPolicy
+      name: backend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+  - target:
+      kind: GCPBackendPolicy
+      name: backend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+      - op: add
+        path: /spec/default/securityPolicy
+        value: wormhole-backend-asia-east1-internal
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: backend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 4
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 4
+      - op: add
+        path: /spec/metrics/1
+        value:
+          type: Object
+          object:
+            describedObject:
+              kind: Service
+              name: backend
+            metric:
+              name: "autoscaling.googleapis.com|gclb-capacity-fullness"
+            target:
+              averageValue: 80
+              type: AverageValue

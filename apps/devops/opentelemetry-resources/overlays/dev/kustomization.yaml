@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: opentelemetry
+
+# ~1 is how JSON Pointer escapes /, so the annotation key iam.gke.io/gcp-service-account must be written as iam.gke.io~1gcp-service-account
+patches:
+  - target:
+      kind: ServiceAccount
+      name: opentelemetry-collector
+    patch: |
+      - op: replace
+        path: /metadata/annotations/iam.gke.io~1gcp-service-account
+        value: devops@wormhole-proj-id.iam.gserviceaccount.com
+  - target:
+      kind: OpenTelemetryCollector
+      name: gcp-k8s-otlp
+    patch: |
+      - op: replace
+        path: /spec/config/processors/resource~1gcp_project_id/attributes/0/value
+        value: wormhole-proj-id
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+  - target:
+      kind: Instrumentation
+      name: wormhole
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1

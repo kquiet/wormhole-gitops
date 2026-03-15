@@ -1,0 +1,56 @@
+@startuml
+package frontend {
+component [frontend pods] as fr
+interface "<font color=red>https://dev.kquiet.org</font>" as fri
+fri -- fr
+}
+
+package backend {
+component [backend pods] as bk
+interface "http://backend.dev.wormhole" as bki
+bki -- bk
+fr --> bki
+}
+
+package preprocessing {
+component [preprocessing pods] as pr
+interface "http://preprocessing.dev.wormhole" as pri
+pri -- pr
+bk --> pri
+}
+
+package embedding {
+component [embedding pods] as eb
+interface "http://embedding.dev.wormhole" as ebi
+ebi -- eb
+bk --> ebi
+}
+
+package llm {
+component [llm pods] as llmc
+interface "http://llm.dev.wormhole" as llmi
+llmi -- llmc
+bk --> llmi
+}
+
+package reranker {
+component [reranker pods] as rr
+interface "http://reranker.dev.wormhole" as rri
+rri -- rr
+bk --> rri
+}
+
+package opensearch {
+component [opensearch pods] as op
+interface "<font color=blue>https://opensearch-cluster:9200</font>" as opi
+opi -- op
+bk --> opi
+}
+
+package ocr {
+component [ocr pods] as ocrc
+interface "http://ocr.dev.wormhole" as ocri
+ocri -- ocrc
+pr --> ocri
+}
+@enduml

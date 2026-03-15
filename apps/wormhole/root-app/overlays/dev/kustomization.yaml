@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: wormhole-dev
+
+patches:
+  - target:
+      kind: Application
+      name: opensearch-cluster-resources
+    path: application-patch.yaml
+  - target:
+      kind: Application
+      name: ocr
+    path: application-patch.yaml
+  - target:
+      kind: Application
+      name: preprocessing
+    path: application-patch.yaml
+  - target:
+      kind: Application
+      name: frontend
+    path: application-patch.yaml
+  - target:
+      kind: Application
+      name: embedding
+    path: application-patch.yaml
+  - target:
+      kind: Application
+      name: llm
+    path: application-patch.yaml
+  - target:
+      kind: Application
+      name: reranker
+    path: application-patch.yaml
+  - target:
+      kind: Application
+      name: backend
+    path: application-patch.yaml

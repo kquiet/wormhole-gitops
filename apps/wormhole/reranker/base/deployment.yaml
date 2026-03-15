@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reranker
+spec:
+  selector:
+    matchLabels:
+      app: reranker
+  template:
+    metadata:
+      labels:
+        app: reranker
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "opentelemetry/wormhole"
+        instrumentation.opentelemetry.io/python-container-names: "reranker"
+    spec:
+      volumes:
+        - name: reranker-model-volume
+          emptyDir:
+            sizeLimit: 5Gi
+      initContainers:
+        - name: prepare-reranker-model
+          image: google/cloud-sdk:slim
+          volumeMounts:
+            - name: reranker-model-volume
+              mountPath: /temp-volume-root
+          command:
+            - sh
+            - -c
+            - |
+              echo "Syncing huggingface model from GCS..." && \
+              gsutil -m cp gs://wormhole-reranker/huggingface/hub.tar /tmp && \
+              tar -xvf /tmp/hub.tar -C /temp-volume-root && chown -R root:root /temp-volume-root
+      containers:
+        - name: reranker
+          image: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-reranker:0.1.0
+          volumeMounts:
+            - name: reranker-model-volume
+              mountPath: /models/hf_cache
+          ports:
+            - containerPort: 5004
+          resources:
+            requests:
+              memory: "3072Mi"
+              cpu: "1000m"
+              nvidia.com/gpu: 1
+            limits:
+              memory: "3072Mi"
+              cpu: "1000m"
+              nvidia.com/gpu: 1
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 5004
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5004
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5004
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 12
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: cloud.google.com/gke-provisioning
+                operator: In
+                values:
+                - spot
+            weight: 100
+      tolerations:
+      - key: cloud.google.com/gke-spot
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      nodeSelector:
+        cloud.google.com/gke-gpu-driver-version: "default" # use this to trigger automatic installation of gpu driver during node-autoprovisioing

@@ -1,0 +1,123 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: frontend
+  annotations:
+    cert-manager.io/cluster-issuer: wormhole-cloud-dns-letsencrypt-production
+    cert-manager.io/duration: 2160h #90 days
+    cert-manager.io/renew-before: 360h #15 days
+spec:
+  gatewayClassName: gke-l7-regional-external-managed
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+  - name: https
+    protocol: HTTPS
+    port: 443
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - group: ""
+        kind: Secret
+        name: frontend-public-zoo-com-tls
+---
+apiVersion: networking.gke.io/v1
+kind: GCPGatewayPolicy
+metadata:
+  name: frontend
+spec:
+  default:
+    sslPolicy: wormhole-ssl-asia-east1-external
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: frontend
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend-redirect-http
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: frontend
+    sectionName: http
+  rules:
+  - filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        statusCode: 301
+    matches:
+    - path:
+        type: PathPrefix
+        value: /
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: frontend
+    sectionName: https
+  rules:
+  - backendRefs:
+    - group: ""
+      kind: Service
+      name: frontend
+      port: 80
+      weight: 1
+    matches:
+    - path:
+        type: PathPrefix
+        value: /
+---
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: frontend
+spec:
+  default:
+    checkIntervalSec: 5
+    timeoutSec: 2
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    logConfig:
+      enabled: true
+    config:
+      type: HTTP
+      httpHealthCheck:
+        port: 80
+        requestPath: /
+  targetRef:
+    group: ""
+    kind: Service
+    name: frontend
+---
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: frontend
+spec:
+  default:
+    balancingMode: RATE
+    capacityScalerPercent: 100
+    connectionDraining:
+      drainingTimeoutSec: 0
+    logging:
+      enabled: true
+      optionalMode: INCLUDE_ALL_OPTIONAL
+      sampleRate: 1e6
+    maxRatePerEndpoint: 100
+    sessionAffinity:
+      type: NONE
+    timeoutSec: 300
+  targetRef:
+    group: ""
+    kind: Service
+    name: frontend

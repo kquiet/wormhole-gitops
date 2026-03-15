@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding
+spec:
+  selector:
+    matchLabels:
+      app: embedding
+  template:
+    metadata:
+      labels:
+        app: embedding
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "opentelemetry/wormhole"
+        instrumentation.opentelemetry.io/python-container-names: "embedding"
+    spec:
+      volumes:
+        - name: embedding-data-volume
+          emptyDir:
+            sizeLimit: 1Gi
+      initContainers:
+        - name: prepare-data
+          image: google/cloud-sdk:slim
+          volumeMounts:
+            - name: embedding-data-volume
+              mountPath: /temp-volume-root
+          command:
+            - sh
+            - -c
+            - |
+              echo "Syncing tiktoken_data from GCS..." && \
+              gsutil -m rsync -r gs://wormhole-embedding /temp-volume-root/
+      containers:
+        - name: embedding
+          image: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-embedding:0.1.1
+          volumeMounts:
+            - name: embedding-data-volume
+              mountPath: /opt/wormhole-embedding
+          env:
+          - name: AZURE_OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: embedding-azure-openai
+                key: AZURE_OPENAI_API_KEY
+          - name: AZURE_OPENAI_ENDPOINT
+            value: https://wormhole-dev.openai.azure.com/
+          - name: AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME
+            value: text-embedding-ada-002
+          - name: AZURE_OPENAI_EMBEDDING_MODEL_NAME
+            value: text-embedding-ada-002
+          - name: TIKTOKEN_CACHE_DIR
+            value: "/opt/wormhole-embedding/tiktoken_data"
+          ports:
+            - containerPort: 5005
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "500m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 5005
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 4
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5005
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5005
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 12
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: cloud.google.com/gke-provisioning
+                operator: In
+                values:
+                - spot
+            weight: 50
+          - preference:
+              matchExpressions:
+              - key: nvidia.com/gpu
+                operator: DoesNotExist
+            weight: 100
+      tolerations:
+      - key: cloud.google.com/gke-spot
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule

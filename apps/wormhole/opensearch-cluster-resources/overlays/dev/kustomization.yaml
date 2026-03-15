@@ -1,0 +1,88 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+# only needed when some gcp service outside gke wanna access gke's opensearch cluster
+#  - loadbalancer_service.yaml
+
+namespace: wormhole-dev
+
+patches:
+  - target:
+      kind: ExternalSecret
+      name: opensearch-wormhole-credentials
+    patch: |
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: dev-backend-opensearch-pwd
+  - target:
+      kind: ExternalSecret
+      name: opensearch-admin-credentials
+    patch: |
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: dev-opensearch-admin-pwd
+  - target:
+      kind: ExternalSecret
+      name: opensearch-securityconfig
+    patch: |
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: dev-opensearch-admin-pwd-hash
+  - target:
+      kind: OpenSearchCluster
+      name: opensearch-cluster
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+  - target:
+      kind: OpensearchIndexTemplate
+      name: library-index-template
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: OpensearchIndexTemplate
+      name: individual-index-template
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: OpensearchIndexTemplate
+      name: assistant-index-template
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: OpensearchUser
+      name: wormhole
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: OpensearchRole
+      name: wormhole-index-admin
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: OpensearchUserRoleBinding
+      name: wormhole-index-admin
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+  - target:
+      kind: Service
+      name: opensearch-tcp
+    patch: |
+      - op: add
+        path: /metadata/annotations/external-dns.alpha.kubernetes.io~1hostname
+        value: opensearch.dev.wormhole

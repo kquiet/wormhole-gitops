@@ -1,0 +1,154 @@
+apiVersion: opensearch.opster.io/v1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch-cluster
+spec:
+  general:
+    version: 2.19.2
+    httpPort: 9200
+    pluginsList: []
+    drainDataNodes: true
+    setVMMaxMapCount: true
+    vendor: opensearch
+    serviceName: opensearch-cluster
+    monitoring:
+      enable: false
+    additionalConfig:
+      plugins.security.restapi.password_min_length: "8"
+      plugins.security.restapi.password_score_based_validation_strength: "fair"
+  bootstrap:
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - preference:
+            matchExpressions:
+            - key: cloud.google.com/gke-provisioning
+              operator: In
+              values:
+              - spot
+          weight: 100
+    tolerations:
+    - key: cloud.google.com/gke-spot
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  security:
+    config:
+    ## take a look at opensearch-k8s-operator/docs/userguide/main.md (Custom admin user)
+      adminCredentialsSecret:
+        name: opensearch-admin-credentials
+      securityConfigSecret:
+        name: opensearch-securityconfig
+      adminSecret:
+        name: opensearch-admin-cert # The secret must have keys tls.crt and tls.key
+    tls:
+      transport:
+        generate: false  # Have the operator generate and sign certificates
+        perNode: false  # Separate certificate per node
+        secret:
+          name: opensearch-node-transport # Name of the secret that contains the provided certificate
+        nodesDn: ["CN=opensearch-node-transport"]  # List of certificate DNs allowed to connect
+        adminDn: ["CN=opensearch-admin"]  # List of certificate DNs that should get admin access
+      http:
+        generate: false
+        secret:
+          name: opensearch-node-http # Name of the secret that contains the provided certificate
+  dashboards:
+    enable: true
+    replicas: 1
+    version: 2.19.2
+    opensearchCredentialsSecret:
+      name: opensearch-admin-credentials
+    additionalConfig:
+      opensearch_security.auth.anonymous_auth_enabled: "true"
+      opensearch.requestHeadersWhitelist: |
+        ["securitytenant","Authorization","x-forwarded-for","x-auth-request-access-token", "x-auth-request-email", "x-auth-request-groups"]
+      opensearch_security.multitenancy.enabled: "true"
+    resources:
+      requests:
+         memory: "1Gi"
+         cpu: "500m"
+      limits:
+         memory: "1Gi"
+         cpu: "500m"
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - preference:
+            matchExpressions:
+            - key: cloud.google.com/gke-provisioning
+              operator: In
+              values:
+              - spot
+          weight: 100
+    tolerations:
+    - key: cloud.google.com/gke-spot
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  confMgmt:
+    smartScaler: true
+  nodePools:
+    - component: masters
+      replicas: 3
+      pdb:
+        enable: true
+        minAvailable: 2
+      diskSize: "50Gi"
+      persistence:
+        pvc:
+          storageClass: premium-rwo-retain
+          accessModes:
+          - ReadWriteOnce
+      resources:
+         requests:
+            memory: "4000Mi"
+            cpu: "1"
+         limits:
+            memory: "4000Mi"
+            cpu: "1"
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: cloud.google.com/gke-provisioning
+                operator: In
+                values:
+                - spot
+            weight: 100
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: opster.io/opensearch-cluster
+                operator: In
+                values:
+                - opensearch-cluster
+              - key: opster.io/opensearch-nodepool
+                operator: In
+                values:
+                - masters
+            topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: opster.io/opensearch-cluster
+                  operator: In
+                  values:
+                  - opensearch-cluster
+                - key: opster.io/opensearch-nodepool
+                  operator: In
+                  values:
+                  - masters
+              topologyKey: topology.kubernetes.io/zone
+            weight: 100
+      tolerations:
+      - key: cloud.google.com/gke-spot
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      roles:
+        - "cluster_manager"
+        - "data"

@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: cert-manager
+
+patches:
+  - target:
+      kind: ClusterIssuer
+      name: wormhole-intermediate-ca-issuer
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+  - target:
+      kind: Certificate
+      name: wormhole-intermediate-ca
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: ClusterIssuer
+      name: wormhole-certificate-issuer
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+  - target: # patch for the project where the actual domain locates; manual configuration(IAM & Service Account) is required in advance
+      kind: ClusterIssuer
+      name: wormhole-cloud-dns-letsencrypt-staging
+    patch: |
+      - op: replace
+        path: /spec/acme/solvers/0/dns01/cloudDNS/project
+        value: wormhole-proj-prd-id
+  - target:
+      kind: ClusterIssuer
+      name: wormhole-cloud-dns-letsencrypt-production
+    patch: |
+      - op: replace
+        path: /spec/acme/solvers/0/dns01/cloudDNS/project
+        value: wormhole-proj-prd-id

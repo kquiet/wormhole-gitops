@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - app-argocd-resources.yaml
+  - app-external-secrets.yaml
+  - app-external-secrets-resources.yaml
+  - app-cert-manager.yaml
+  - app-cert-manager-resources.yaml
+  - app-opensearch-operator.yaml
+  - app-external-dns-public.yaml
+  - app-external-dns-private.yaml
+  - app-opentelemetry-operator.yaml
+  - app-opentelemetry-resources.yaml
+  - app-k8s-cluster-resources.yaml

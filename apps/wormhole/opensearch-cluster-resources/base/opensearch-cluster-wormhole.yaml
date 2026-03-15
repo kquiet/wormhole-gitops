@@ -1,0 +1,139 @@
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: opensearch-wormhole-credentials
+spec:
+  secretStoreRef:
+    name: gcp-wormhole-dev
+    kind: ClusterSecretStore
+  refreshInterval: "168h"
+  target:
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: Opaque
+      data:
+        password: "{{ .password }}"
+  data:
+    - secretKey: password
+      remoteRef:
+        key: need-to-override
+---
+apiVersion: opensearch.opster.io/v1
+kind: OpensearchUser
+metadata:
+  name: wormhole
+spec:
+  opensearchCluster:
+    name: opensearch-cluster
+  passwordFrom:
+    name: opensearch-wormhole-credentials
+    key: password
+  backendRoles:
+  - wormhole-app
+---
+apiVersion: opensearch.opster.io/v1
+kind: OpensearchRole
+metadata:
+  name: wormhole-index-admin
+spec:
+  opensearchCluster:
+    name: opensearch-cluster
+  clusterPermissions:
+  - "cluster:admin/component_template/*"
+  - "cluster:admin/opendistro/ism/*"
+  - "cluster:admin/opensearch/observability/*"
+  - "cluster:admin/opensearch/snapshot_management/*"
+  - "cluster:admin/opendistro/rollup/*"
+  - "cluster:admin/opendistro/reports/*"
+  - "cluster:admin/opendistro/transform/*"
+  - "cluster:admin/reindex/rethrottle"
+  - "cluster:admin/repository/*"
+  - "cluster:admin/snapshot/*"
+  - "cluster:monitor/*"
+  - "indices:admin/index_template/*"
+  - "indices:admin/template/*"
+  - "indices:data/read/*"
+  - "indices:data/write/*"
+  indexPermissions:
+  - indexPatterns:
+    - "library-index-*"
+    allowedActions:
+    - "indices:*"
+  - indexPatterns:
+    - "individual-index-*"
+    allowedActions:
+    - "indices:*"
+  - indexPatterns:
+    - "assistant-index-*"
+    allowedActions:
+    - "indices:*"
+  - indexPatterns:
+    - "*"
+    allowedActions:
+    - "indices:admin/aliases/get"
+    - "indices:admin/data_stream/get"
+    - "indices:admin/get"
+    - "indices:admin/mappings/get"
+    - "indices:monitor/data_stream/stats"
+    - "indices:monitor/segments"
+    - "indices:monitor/settings/get"
+    - "indices:monitor/shard_stores"
+    - "indices:monitor/stats"
+---
+apiVersion: opensearch.opster.io/v1
+kind: OpensearchUserRoleBinding
+metadata:
+  name: wormhole-index-admin
+spec:
+  opensearchCluster:
+    name: opensearch-cluster
+  backendRoles:
+  - wormhole-app
+  roles:
+  - wormhole-index-admin
+---
+apiVersion: opensearch.opster.io/v1
+kind: OpensearchIndexTemplate
+metadata:
+  name: library-index-template
+spec:
+  opensearchCluster:
+    name: opensearch-cluster
+  indexPatterns:
+    - "library-index-*"
+  priority: 1000
+  template:
+    settings:
+      number_of_shards: 1
+      number_of_replicas: 1
+---
+apiVersion: opensearch.opster.io/v1
+kind: OpensearchIndexTemplate
+metadata:
+  name: individual-index-template
+spec:
+  opensearchCluster:
+    name: opensearch-cluster
+  indexPatterns:
+    - "individual-index-*"
+  priority: 1000
+  template:
+    settings:
+      number_of_shards: 1
+      number_of_replicas: 1
+---
+apiVersion: opensearch.opster.io/v1
+kind: OpensearchIndexTemplate
+metadata:
+  name: assistant-index-template
+spec:
+  opensearchCluster:
+    name: opensearch-cluster
+  indexPatterns:
+    - "assistant-index-*"
+  priority: 1000
+  template:
+    settings:
+      number_of_shards: 1
+      number_of_replicas: 1

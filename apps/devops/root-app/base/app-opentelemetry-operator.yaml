@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opentelemetry-operator
+spec:
+  project: need-to-override
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-operator
+    targetRevision: 0.90.4
+    helm:
+      releaseName: opentelemetry-operator
+      valuesObject:
+        manager:
+          # should use the image from https://github.com/GoogleCloudPlatform/otlp-k8s-ingest/blob/main/k8s/base/4_deployment.yaml
+          # reference: https://cloud.google.com/stackdriver/docs/instrumentation/opentelemetry-collector-gke#deploy-collector
+          collectorImage:
+            repository: need-to-override
+            tag: need-to-override
+          autoInstrumentationImage:
+            python:
+              repository: need-to-override
+              tag: need-to-override
+          extraArgs:
+          - --enable-multi-instrumentation=true
+          - --enable-go-instrumentation=true
+          - --enable-nginx-instrumentation=true
+          featureGatesMap:
+            operator.golang.flags: true
+        admissionWebhooks:
+          namespaceSelector:
+            matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: NotIn
+              values:
+              - argocd
+              - cert-manager
+              - custom-metrics
+              - external-dns-private
+              - external-dns-public
+              - external-secrets
+              - gke-managed-cim
+              - gke-managed-dpv2-observability
+              - gke-managed-system
+              - gke-managed-volumepopulator
+              - gmp-public
+              - gmp-system
+              - kube-node-lease
+              - kube-public
+              - kube-system
+              - opensearch-operator
+          certManager:
+            issuerRef:
+              kind: ClusterIssuer
+              name: wormhole-intermediate-ca-issuer
+            duration: 35064h # 4 years
+            renewBefore: 2160h # 90 days
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                - key: cloud.google.com/gke-provisioning
+                  operator: In
+                  values:
+                  - spot
+              weight: 100
+        tolerations:
+        - key: cloud.google.com/gke-spot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+  destination:
+    server: need-to-override
+    namespace: opentelemetry
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

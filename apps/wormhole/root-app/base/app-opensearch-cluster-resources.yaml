@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opensearch-cluster-resources
+spec:
+  project: need-to-override
+  source:
+    repoURL: need-to-override
+    path: apps/wormhole/opensearch-cluster-resources/overlays/dev
+    targetRevision: HEAD
+  destination:
+    server: need-to-override
+    namespace: need-to-override
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      name: opensearch-admin-credentials
+      jsonPointers:
+        - /spec/data/0/remoteRef/conversionStrategy
+        - /spec/data/0/remoteRef/decodingStrategy
+        - /spec/data/0/remoteRef/metadataPolicy
+    - group: external-secrets.io
+      kind: ExternalSecret
+      name: opensearch-securityconfig
+      jsonPointers:
+        - /spec/data/0/remoteRef/conversionStrategy
+        - /spec/data/0/remoteRef/decodingStrategy
+        - /spec/data/0/remoteRef/metadataPolicy
+    - group: external-secrets.io
+      kind: ExternalSecret
+      name: opensearch-wormhole-credentials
+      jsonPointers:
+        - /spec/data/0/remoteRef/conversionStrategy
+        - /spec/data/0/remoteRef/decodingStrategy
+        - /spec/data/0/remoteRef/metadataPolicy
+    - group: opensearch.opster.io
+      kind: OpenSearchCluster
+      name: opensearch-cluster
+      jsonPointers:
+        - /spec/general/monitoring
+        - /spec/general/pluginsList
+        - /spec/security/tls/http/generate
+        - /spec/security/tls/transport/generate
+        - /spec/security/tls/transport/perNode

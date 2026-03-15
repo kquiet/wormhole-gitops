@@ -1,0 +1,113 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - gateway_route_policy.yaml
+
+namespace: wormhole-dev
+
+patches:
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-frontend:0.0.0
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: BACKEND_URL
+          value: http://backend.dev.wormhole
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: PROXY_HEADER_HOST
+          value: backend.dev.wormhole
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: PROXY_HTTP_VERSION
+          value: "1.1"
+  - target:
+      kind: Service
+      name: frontend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+  - target:
+      kind: Gateway
+      name: frontend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+      - op: add
+        path: /spec/listeners/1/hostname
+        value: dev.kquiet.org
+  - target:
+      kind: GCPGatewayPolicy
+      name: frontend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: HTTPRoute
+      name: frontend-redirect-http
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: HTTPRoute
+      name: frontend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: HealthCheckPolicy
+      name: frontend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: GCPBackendPolicy
+      name: frontend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+      - op: add
+        path: /spec/default/securityPolicy
+        value: devops-backend-asia-east1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: frontend
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+      - op: add
+        path: /spec/metrics/2
+        value:
+          type: Object
+          object:
+            describedObject:
+              kind: Service
+              name: frontend
+            metric:
+              name: "autoscaling.googleapis.com|gclb-capacity-fullness"
+            target:
+              averageValue: 70
+              type: AverageValue

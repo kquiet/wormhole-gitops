@@ -1,0 +1,94 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - gateway_route_policy.yaml
+
+namespace: wormhole-dev
+
+patches:
+  - target:
+      kind: ExternalSecret
+      name: embedding-azure-openai
+    patch: |
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: dev-azure-openai-api-key
+  - target:
+      kind: Deployment
+      name: embedding
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: asia-east1-docker.pkg.dev/wormhole-proj-id/virtual/wormhole-embedding:0.1.1
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+  - target:
+      kind: Service
+      name: embedding
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 1
+  - target:
+      kind: Gateway
+      name: embedding
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+      - op: add
+        path: /spec/listeners/0/hostname
+        value: embedding.dev.wormhole
+  - target:
+      kind: HTTPRoute
+      name: embedding
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: HealthCheckPolicy
+      name: embedding
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+  - target:
+      kind: GCPBackendPolicy
+      name: embedding
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 2
+      - op: add
+        path: /spec/default/securityPolicy
+        value: wormhole-backend-asia-east1-internal
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: embedding
+    patch: |
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: 3
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 4
+      - op: add
+        path: /spec/metrics/1
+        value:
+          type: Object
+          object:
+            describedObject:
+              kind: Service
+              name: embedding
+            metric:
+              name: "autoscaling.googleapis.com|gclb-capacity-fullness"
+            target:
+              averageValue: 50
+              type: AverageValue
